@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >-
+  This cloudformation gives you the credibility to create the SNS Topic with Custom Policy and Set the SNS Subscription.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'S3 Configuration'
+      Parameters:
+      - BucketName
+      - Region
+    - Label:
+        default: 'SNS Configuration'
+      Parameters:
+      - DisplayName
+      - SNSTopicName
+      - SubscriptionEndPoint
+      - SubscriptionProtocol 
+    - Label:
+        default: 'Tagging Configuration'
+      Parameters:
+      - Country
+      - Department
+      - Environment
+      - Project
+      - Service
+
+Parameters:
+  BucketName:
+    Description: 'Which S3 Bucket you want to allow for the SNS? (Please make sure that s3 bucket do exist in the same region)'
+    Type: String
+    Default: 'your-s3-bucket-name'
+    MinLength: 3
+    MaxLength: 63
+    AllowedPattern: '([a-zA-Z][a-zA-Z0-9_-]*)'
+    ConstraintDescription: "Constraint Error! S3 Bucket Name is invalid or doesn't exist. Please check the s3 bucket name again."
+
+  Country:
+    Description: 'Which country tag to apply to the service?'
+    Type: String
+    AllowedValues:
+    - Australia
+    - India
+    - China
+    - NewZealand
+    - Philippines
+    Default: Australia
+
+  Department:
+    Description: 'Which department tag to apply to the service?'
+    Type: String
+    AllowedValues:
+      - InformationTechnology
+      - General-Department
+      - Finance
+      - Marketing
+      - Operations
+    Default: InformationTechnology
+  
+  DisplayName:
+    Type: String
+    Description: The display name to use for an Amazon SNS topic with Email or SMS subscriptions.
+    Default: 'AWS SNS Notification'
+    MaxLength: 32
+    ConstraintDescription: 'Constraint Error! DisplayName parameter must only contain length less than 32 characters'
+  
+  Environment:
+    Description: 'A Tag to differentiate the environment'
+    Type: String
+    AllowedValues:
+      - Testing
+      - Development
+      - Staging
+      - Production
+    Default: Production 
+  
+  Project:
+    Description: 'The name of the project on this resource' 
+    Type: String
+    Default: Project-Name
+    
+  Service:
+    Description: 'The name of the service on this resource'
+    Type: String
+    Default: Reference-Logger
+  
+  SNSTopicName:
+    Type: String
+    Description: Enter the SNS Topic Name (please follow the same naming convention as provided below)
+    Default: aws-sns-alert-service
+    MinLength: 10
+    AllowedPattern: '([a-z\-]+)'
+    ConstraintDescription: "Contraint Error! SNSTopicName parameter must only contain lowercase letters and hypen with minimum length of 10 characters"
+
+  SubscriptionEndPoint:
+    Type: String
+    Description: The endpoint email that receives notifications.
+    Default: 'ekko-tech-emailaddress@ekko-tech.com.au'
+    AllowedPattern: '.*ekko-tech.com.au'
+    ConstraintDescription: 'Constraint Error! SubscriptionEndPoint parameter must only contain ekko-tech Email Address.'
+    
+  SubscriptionProtocol:
+    Type: String
+    Description: The subscription protocol
+    AllowedValues:
+    - http
+    - https
+    - email
+    - email-json
+    - sms
+    - sqs
+    - application
+    - lambda
+    - firehose
+    Default: email
+
+  Region:
+    Type: String
+    Description: For cross-region subscriptions, the region in which the topic resides.
+    AllowedValues:                # https://docs.aws.amazon.com/sns/latest/dg/sns-supported-regions-countries.html
+    - us-east-2                   # US East (Ohio)
+    - us-east-1                   # US East (N. Virginia)
+    - us-west-1                   # US West (N. California)
+    - us-west-2                   # US West (Oregon)
+    - ap-south-1                  # Asia Pacific (Mumbai)
+    - ap-southeast-1              # Asia Pacific (Singapore)
+    - ap-southeast-2              # Asia Pacific (Sydney)
+    - ap-northeast-1              # Asia Pacific (Tokyo)
+    - ca-central-1                # Canada (Central)
+    - eu-central-1                # Europe (Frankfurt)
+    - eu-west-1                   # Europe (Ireland)
+    - eu-west-2                   # Europe (London)
+    - eu-west-3                   # Europe (Paris)
+    - eu-north-1                  # Europe (Stockholm)
+    - me-south-1                  # Middle East (Bahrain)
+    - sa-east-1                   # South America (São Paulo)
+    - us-gov-west-1               # AWS GovCloud (US-West)
+    Default: sa-east-1            
+
+Conditions:
+  HasBucket: !Not [!Equals [!Ref BucketName, '']]
+
+Resources:
+  Topic:
+    Condition: HasBucket
+    Type: AWS::SNS::Topic
+    Properties:
+      FifoTopic: false            
+      DisplayName: !Ref DisplayName
+      KmsMasterKeyId: false
+      TopicName: !Ref SNSTopicName  # In case of fifo (TopicName: DemoFifoTopic.fifo)
+      Tags:
+      - Key: Country
+        Value: !Ref Country
+      - Key: Department
+        Value: !Ref Department
+      - Key: Environment
+        Value: !Ref Environment
+      - Key: Project
+        Value: !Ref Project 
+      - Key: Service
+        Value: !Ref Service  
+      - Key: DisplayName
+        Value: !Ref DisplayName 
+      - Key: SubscriptionEndPoint
+        Value: !Ref SubscriptionEndPoint
+      - Key: SubscriptionProtocol
+        Value: !Ref SubscriptionProtocol
+      - Key: StackID
+        Value: !Sub '${AWS::StackId}'
+      - Key: StackName
+        Value: !Sub '${AWS::StackName}'  
+
+  TopicPolicy:
+    Condition: HasBucket
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: S3BucketAccessPolicy
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowServices
+            Effect: Allow
+            Principal:
+              Service:
+                - s3.amazonaws.com
+            Action: 'SNS:Publish'
+            Resource:
+              - !Ref Topic
+            Condition:
+              ArnLike:
+                aws:SourceArn: !Join        # this join expression eventually looks like this "arn:aws:s3:::bucket-name"
+                                 - ':'
+                                 - - 'arn:aws:s3::'
+                                   - !Ref BucketName
+      Topics:
+        - !Ref Topic
+
+  TopicSubscription:
+    Condition: HasBucket
+    Type: AWS::SNS::Subscription
+    Properties: 
+      TopicArn: !Ref Topic       
+      Endpoint: !Ref SubscriptionEndPoint
+#     FilterPolicy: Json
+      Protocol: !Ref SubscriptionProtocol
+#     RawMessageDelivery: false
+#     RedrivePolicy: Json
+      Region: !Ref Region
+      # If you need to customise the deliverypolicy, either manually provide the value below or pass it from the parameters section. 
+      DeliveryPolicy: 
+        healthyRetryPolicy:
+          numRetries: 5
+          minDelayTarget: 20
+          maxDelayTarget: 30
+          numMinDelayRetries: 1
+          numMaxDelayRetries: 3
+          numNoDelayRetries: 0
+          backoffFunction: linear
+Outputs:
+  SNSTopicName:
+    Description: 'SNS Topic Name'
+    Value: !Ref SNSTopicName
+    Export:
+      Name: !Sub '${AWS::StackName}-SNSTopicName'
+  TemplateVersion:
+    Description: 'template version.'
+    Value: '0.1'
+  SubscriptionEndPoint:
+    Description: 'SubscriptionEndPoint'
+    Value: !Ref SubscriptionEndPoint
+    Export:
+      Name: !Sub '${AWS::StackName}-SubscriptionEndPoint'
+  StackId:
+    Description: 'Stack ID'
+    Value: !Sub '${AWS::StackId}'
+
+# Optional Output tags
+  DepartmentTag:
+    Value: !Ref Department
+    Description: The Tag chosen for the Department
+    Export:
+      Name: !Sub ${AWS::StackName}-DepartmentTag
+  ProjectTag:
+    Value: !Ref Project
+    Description: The Tag chosen for the Project
+    Export:
+      Name: !Sub ${AWS::StackName}-ProjectTag
+  EnvironmentTag:
+    Value: !Ref Environment
+    Description: The Tag chosen for the Environment
+    Export:
+      Name: !Sub ${AWS::StackName}-EnvironmentTag
+  ServiceTag:
+    Value: !Ref Service
+    Description: The Tag chosen for the Service
+    Export:
+      Name: !Sub ${AWS::StackName}-ServiceTag
+  CountryTag:
+    Value: !Ref Country
+    Description: The Tag chosen for the Country
+    Export:
+      Name: !Sub ${AWS::StackName}-CountryTag
