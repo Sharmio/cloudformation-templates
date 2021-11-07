@@ -45,7 +45,9 @@ Parameters:
     - China
     - NewZealand
     - Philippines
-    Default: Australia
+    - Brazil
+    - Portugal
+    Default: Brazil
 
   Department:
     Description: 'Which department tag to apply to the service?'
@@ -73,12 +75,12 @@ Parameters:
       - Development
       - Staging
       - Production
-    Default: Production 
+    Default: Staging 
   
   Project:
     Description: 'The name of the project on this resource' 
     Type: String
-    Default: Project-Name
+    Default: Your-Project-Name
     
   Service:
     Description: 'The name of the service on this resource'
