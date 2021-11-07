@@ -98,8 +98,8 @@ Parameters:
   SubscriptionEndPoint:
     Type: String
     Description: The endpoint email that receives notifications.
-    Default: 'sharmio-emailaddress@sharmio.com.au'
-    AllowedPattern: '*@sharmio.com.au'
+    Default: 'youremailaddress@sharmio.com.au'
+    AllowedPattern: '.*@sharmio.com.au'
     ConstraintDescription: 'Constraint Error! SubscriptionEndPoint parameter must only contain sharmio Email Address.'
     
   SubscriptionProtocol:
